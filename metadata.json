@@ -1,6 +1,6 @@
 {
-  "name": "Nexus Student Analytics",
-  "description": "Ultra-modern data visualization dashboard for student performance analysis, featuring glassmorphism design and interactive real-time insights.",
+  "name": "DIT Adult Census Dashboard",
+  "description": "Dashboard interactif d'analyse du dataset Adult Census Income pour l'examen de Data Visualization (DIT). Visualisations multi-dimensionnelles des revenus et de la démographie.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["Data Visualization", "Predictive Analytics Interface", "Interactive Dashboards"]
+  "majorCapabilities": ["Data Visualization", "Interactive Dashboard", "Census Analysis"]
 }

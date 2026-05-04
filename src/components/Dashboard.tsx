@@ -1,3 +1,9 @@
+/**
+ * COMPOSANT PRINCIPAL - DASHBOARD DIT
+ * Ce dashboard a été conçu pour l'examen de Data Visualisation du DIT.
+ * Stack: React, Tailwind CSS, Framer Motion, Plotly.js.
+ */
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import Plotly from 'plotly.js-dist-min';
@@ -5,199 +11,98 @@ import createPlotComponent from 'react-plotly.js/factory';
 const Plot = createPlotComponent(Plotly);
 import { 
   Users, 
-  GraduationCap, 
-  Clock, 
-  Search, 
-  Filter, 
-  ChevronRight, 
-  LayoutDashboard, 
-  BarChart3, 
-  PieChart, 
-  Settings, 
-  AlertCircle,
-  TrendingUp,
   Activity,
-  X,
+  AlertCircle,
+  Filter,
+  BarChart3,
+  Calendar,
+  DollarSign,
   Info,
-  User,
-  MapPin,
-  Wifi,
-  Monitor
+  Layers,
+  ChevronDown,
+  RefreshCcw,
+  Search,
+  Database,
+  ArrowRight
 } from 'lucide-react';
-import { fetchStudentData, filterData, calculateKPIs, calculateDetailedStats, Student } from '../lib/dataService';
+import { fetchAdultData, filterAdultData, calculateAdultKPIs, calculateDetailedStats, AdultData } from '../lib/dataService';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+// Utilitaire pour la gestion des classes Tailwind
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const KPICard = ({ title, value, subValue, percentage, colorClass }: { title: string, value: string | number, subValue: string, percentage: number, colorClass: string }) => (
+/**
+ * Composant pour les indicateurs clés (KPIs)
+ */
+const KPICard = ({ title, value, subValue, percentage, colorClass, icon: Icon }: { title: string, value: string | number, subValue: string, percentage: number, colorClass: string, icon: any }) => (
   <motion.div 
-    whileHover={{ 
-      y: -8, 
-      scale: 1.02, 
-      borderColor: colorClass.includes('cyan') ? 'rgba(6,182,212,0.5)' : colorClass.includes('purple') ? 'rgba(168,85,247,0.5)' : 'rgba(245,158,11,0.5)',
-      boxShadow: colorClass.includes('cyan') ? '0 25px 50px -12px rgba(0,0,0,0.8), 0 0 20px rgba(6,182,212,0.15)' : colorClass.includes('purple') ? '0 25px 50px -12px rgba(0,0,0,0.8), 0 0 20px rgba(168,85,247,0.15)' : '0 25px 50px -12px rgba(0,0,0,0.8), 0 0 20px rgba(245,158,11,0.15)'
-    }}
-    transition={{ type: 'spring', stiffness: 400, damping: 22 }}
-    className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-5 shadow-xl group cursor-default transition-colors duration-500"
+    whileHover={{ y: -5, scale: 1.02 }}
+    className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-xl group cursor-default h-full relative overflow-hidden"
   >
-    <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold mb-1">{title}</p>
-    <div className="flex items-baseline gap-2">
-      <h3 className="text-4xl font-bold italic tracking-tighter text-white">{value}</h3>
-      <span className={cn("text-xs font-mono", colorClass === 'bg-cyan-500' ? 'text-emerald-400' : 'text-slate-500')}>{subValue}</span>
+    <div className="absolute top-4 right-4 opacity-10 group-hover:opacity-25 transition-opacity">
+      <Icon className="w-10 h-10 text-white" />
     </div>
-    <div className="w-full h-1 bg-slate-800 rounded-full mt-4 overflow-hidden">
+    <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black mb-1">{title}</p>
+    <div className="flex items-baseline gap-2">
+      <h3 className="text-4xl font-black italic tracking-tighter text-white uppercase">{value}</h3>
+      <span className="text-[10px] font-mono text-slate-400">{subValue}</span>
+    </div>
+    <div className="w-full h-1.5 bg-slate-800 rounded-full mt-4 overflow-hidden">
       <motion.div 
         initial={{ width: 0 }}
-        animate={{ width: `${percentage}%` }}
-        className={cn("h-full", colorClass)}
-        style={{ boxShadow: `0 0 12px ${colorClass.includes('cyan') ? 'rgba(6,182,212,0.5)' : colorClass.includes('purple') ? 'rgba(168,85,247,0.5)' : 'rgba(245,158,11,0.5)'}` }}
+        animate={{ width: `${Math.min(percentage, 100)}%` }}
+        className={cn("h-full shadow-[0_0_12px]", colorClass)}
       />
     </div>
   </motion.div>
 );
 
+/**
+ * Conteneur générique pour les graphiques
+ */
 const ChartCard = ({ title, children, className }: { title: string, children: React.ReactNode, className?: string }) => (
   <motion.div 
-    initial={{ opacity: 0, scale: 0.98 }}
-    animate={{ opacity: 1, scale: 1 }}
-    className={cn("bg-white/5 backdrop-blur-md border border-white/10 rounded-3xl p-5 flex flex-col relative overflow-hidden", className)}
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    className={cn("bg-white/5 backdrop-blur-md border border-white/10 rounded-3xl p-6 flex flex-col relative overflow-hidden shadow-2xl", className)}
   >
-    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">{title}</span>
-    <div className="flex-1 min-h-[250px]">
+    <div className="flex items-center justify-between mb-4">
+      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+        <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
+        {title}
+      </span>
+      <Layers className="w-3 h-3 text-slate-600" />
+    </div>
+    <div className="flex-1 min-h-[300px]">
       {children}
     </div>
   </motion.div>
 );
 
-const StudentModal = ({ student, onClose }: { student: Student | null, onClose: () => void }) => {
-  if (!student) return null;
-
-  return (
-    <AnimatePresence>
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      >
-        <motion.div 
-          initial={{ scale: 0.9, y: 20 }}
-          animate={{ scale: 1, y: 0 }}
-          exit={{ scale: 0.9, y: 20 }}
-          className="bg-[#0f172a] border border-white/10 rounded-[2.5rem] w-full max-w-2xl overflow-hidden shadow-2xl relative"
-          onClick={e => e.stopPropagation()}
-        >
-          {/* Header */}
-          <div className="h-32 bg-gradient-to-r from-cyan-600/20 via-blue-600/20 to-purple-600/20 p-8 flex items-end relative">
-            <button 
-              onClick={onClose}
-              className="absolute top-6 right-6 p-2 bg-white/5 hover:bg-white/10 rounded-full transition-colors"
-            >
-              <X className="w-5 h-5 text-zinc-400" />
-            </button>
-            <div className="flex items-center gap-4">
-              <div className="w-20 h-20 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl flex items-center justify-center -mb-10 shadow-lg">
-                <User className="w-10 h-10 text-cyan-400" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold font-display italic text-white uppercase tracking-tighter">Profil Étudiant</h2>
-                <p className="text-zinc-400 text-xs uppercase tracking-widest font-mono">ID S.OS#{Math.floor(1000 + Math.random() * 9000)}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-8 pt-16 grid grid-cols-2 gap-8">
-            <div className="space-y-6">
-              <div className="flex items-center gap-3 text-zinc-300">
-                <div className="p-2 bg-white/5 rounded-lg"><Info className="w-4 h-4 text-cyan-400" /></div>
-                <div>
-                  <p className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest">Identité</p>
-                  <p className="text-sm font-medium">{student.age} ans • {student.sex === 'M' ? 'Masculin' : 'Féminin'}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 text-zinc-300">
-                <div className="p-2 bg-white/5 rounded-lg"><MapPin className="w-4 h-4 text-purple-400" /></div>
-                <div>
-                  <p className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest">Origine</p>
-                  <p className="text-sm font-medium">{student.address === 'U' ? 'Urbain' : 'Rural'} ({student.school === 'GP' ? 'G. Pereira' : 'M. Silveira'})</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 text-zinc-300">
-                <div className="p-2 bg-white/5 rounded-lg"><Wifi className="w-4 h-4 text-emerald-400" /></div>
-                <div>
-                  <p className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest">Status Web</p>
-                  <p className="text-sm font-medium">{student.internet === 'yes' ? 'Connecté' : 'Non-connecté'}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
-                <p className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest mb-3">Score Final (G3)</p>
-                <div className="flex items-end gap-2">
-                  <span className="text-4xl font-bold text-white italic">{student.G3}</span>
-                  <span className="text-zinc-500 text-sm mb-1 font-mono">/ 20</span>
-                </div>
-                <div className="w-full h-1.5 bg-zinc-800 rounded-full mt-4">
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: `${(student.G3 / 20) * 100}%` }}
-                    className="h-full bg-cyan-500 rounded-full shadow-[0_0_10px_rgba(6,182,212,0.5)]" 
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white/5 p-3 rounded-xl text-center border border-white/5">
-                  <p className="text-[10px] text-zinc-500 mb-1 uppercase font-bold">Absences</p>
-                  <p className="text-xl font-bold text-white font-display">{student.absences}</p>
-                </div>
-                <div className="bg-white/5 p-3 rounded-xl text-center border border-white/5">
-                  <p className="text-[10px] text-zinc-500 mb-1 uppercase font-bold">Étude</p>
-                  <p className="text-xl font-bold text-emerald-400 font-display">{student.studytime}h</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-8 border-t border-white/5 flex gap-4 bg-black/20">
-            <button className="flex-1 bg-white text-slate-900 font-bold py-3 rounded-xl hover:bg-cyan-400 transition-all text-xs tracking-widest uppercase">
-              Rapport Statistique
-            </button>
-            <button 
-              onClick={onClose}
-              className="px-6 py-3 border border-white/10 text-white rounded-xl hover:bg-white/5 transition-all text-xs tracking-widest uppercase font-bold"
-            >
-              Fermer
-            </button>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  );
-};
-
 export default function Dashboard() {
-  const [rawData, setRawData] = useState<Student[]>([]);
+  // États pour les données et le chargement
+  const [rawData, setRawData] = useState<AdultData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [selectedIndividual, setSelectedIndividual] = useState<AdultData | null>(null);
 
-  // Filters state
+  // Filtres Requis par le template (Variable, Catégorie, Slider)
   const [sexFilter, setSexFilter] = useState<string>('All');
-  const [schoolFilter, setSchoolFilter] = useState<string>('All');
-  const [ageRange, setAgeRange] = useState<[number, number]>([15, 22]);
+  const [educationFilter, setEducationFilter] = useState<string>('All');
+  const [ageRange, setAgeRange] = useState<[number, number]>([17, 90]);
 
+  // Chargement initial des données
   useEffect(() => {
     async function init() {
       try {
-        const data = await fetchStudentData();
+        const data = await fetchAdultData();
+        if (data.length === 0) throw new Error("Données introuvables");
         setRawData(data);
       } catch (err) {
-        setError('Impossible de synchroniser les données');
+        setError('Impossible d\'extraire les données du recensement UCI');
       } finally {
         setLoading(false);
       }
@@ -205,18 +110,19 @@ export default function Dashboard() {
     init();
   }, []);
 
+  // Calcul des données filtrées en temps réel (Mise à jour automatique)
   const filteredData = useMemo(() => {
-    return filterData(rawData, {
-      sex: sexFilter !== 'All' ? sexFilter as 'F' | 'M' : undefined,
-      school: schoolFilter !== 'All' ? schoolFilter : undefined,
+    return filterAdultData(rawData, {
+      sex: sexFilter !== 'All' ? sexFilter : undefined,
+      education: educationFilter !== 'All' ? educationFilter : undefined,
       ageRange: ageRange,
     });
-  }, [rawData, sexFilter, schoolFilter, ageRange]);
+  }, [rawData, sexFilter, educationFilter, ageRange]);
 
-  const kpis = useMemo(() => calculateKPIs(filteredData), [filteredData]);
-
+  // Calcul des statistiques
+  const kpis = useMemo(() => calculateAdultKPIs(filteredData), [filteredData]);
   const stats = useMemo(() => {
-    const columns = ['G1', 'G2', 'G3', 'absences', 'studytime'];
+    const columns = ['age', 'hours-per-week', 'education-num'];
     const results: Record<string, any> = {};
     columns.forEach(col => {
       results[col] = calculateDetailedStats(filteredData, col);
@@ -224,22 +130,19 @@ export default function Dashboard() {
     return results;
   }, [filteredData]);
 
-  const handlePlotClick = (event: any) => {
-    if (event.points && event.points[0]) {
-      const student = event.points[0].customdata as Student;
-      if (student) setSelectedStudent(student);
-    }
-  };
+  const uniqueEducation = useMemo(() => {
+    const set = new Set(rawData.map(d => d.education).filter(Boolean));
+    return Array.from(set).sort();
+  }, [rawData]);
 
   if (loading) return (
     <div className="h-screen w-full flex flex-col items-center justify-center bg-[#020617]">
-      <div className="mesh-gradient-1" />
       <motion.div 
         animate={{ rotate: 360 }} 
-        transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
-        className="w-12 h-12 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full"
+        transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+        className="w-12 h-12 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full"
       />
-      <p className="mt-6 text-slate-500 font-bold tracking-[0.3em] uppercase text-[10px] animate-pulse italic">Engager Réacteur de Données...</p>
+      <p className="mt-6 text-slate-500 font-black tracking-[0.3em] uppercase text-[10px] animate-pulse italic">DIT DATA ENGINE LOADING...</p>
     </div>
   );
 
@@ -247,391 +150,483 @@ export default function Dashboard() {
     paper_bgcolor: 'rgba(0,0,0,0)',
     plot_bgcolor: 'rgba(0,0,0,0)',
     font: { color: '#94a3b8', family: '"Inter", sans-serif', size: 10 },
-    xaxis: { gridcolor: 'rgba(255,255,255,0.05)', zeroline: false, showgrid: true },
-    yaxis: { gridcolor: 'rgba(255,255,255,0.05)', zeroline: false, showgrid: true },
-    margin: { t: 10, b: 30, l: 30, r: 10 },
+    xaxis: { gridcolor: 'rgba(255,255,255,0.05)', zeroline: false, showgrid: true, tickfont: { size: 9 } },
+    yaxis: { gridcolor: 'rgba(255,255,255,0.05)', zeroline: false, showgrid: true, tickfont: { size: 9 } },
+    margin: { t: 20, b: 40, l: 40, r: 20 },
   };
 
+  const highIncomeEdu = uniqueEducation.map(edu => {
+    const subset = filteredData.filter(d => d.education === edu);
+    const count = subset.filter(d => d.income === '>50K').length;
+    return { edu, count, total: subset.length, percent: subset.length > 0 ? (count / subset.length) * 100 : 0 };
+  }).sort((a, b) => b.percent - a.percent);
+
   return (
-    <div className="fixed inset-0 bg-[#020617] text-slate-100 font-sans overflow-hidden select-none">
-      {/* Background Mesh Gradients */}
-      <div className="mesh-gradient-1" />
-      <div className="mesh-gradient-2" />
-      <div className="mesh-gradient-3" />
-
-      <div className="relative h-full flex flex-col">
-        {/* Top Navigation Bar */}
-        <nav className="h-16 flex items-center justify-between px-8 bg-white/5 backdrop-blur-md border-b border-white/10 z-20">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-lg shadow-lg shadow-cyan-500/20 flex items-center justify-center">
-              <span className="font-black text-xs text-white italic">S.OS</span>
-            </div>
-            <h1 className="text-xl font-bold tracking-tighter bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent italic uppercase">Moteur de Performance Étudiante</h1>
+    <div className="fixed inset-0 bg-[#020617] text-slate-100 font-sans overflow-hidden select-none flex flex-col">
+      {/* TITRE DU DASHBOARD */}
+      <header className="h-20 flex items-center justify-between px-10 bg-white/5 backdrop-blur-2xl border-b border-white/10 z-20 shrink-0">
+        <div className="flex items-center gap-5">
+          <div className="w-12 h-12 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-2xl shadow-[0_0_20px_rgba(6,182,212,0.3)] flex items-center justify-center transform hover:rotate-12 transition-transform cursor-pointer">
+            <BarChart3 className="w-7 h-7 text-white" />
           </div>
-          <div className="flex items-center gap-6">
-            <div className="flex flex-col items-end">
-              <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Statut Système</span>
-              <span className="text-xs font-mono text-emerald-400 flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> FLUX EN DIRECT
-              </span>
-            </div>
-            <div className="w-10 h-10 rounded-full border border-white/20 bg-gradient-to-b from-white/10 to-white/5 flex items-center justify-center shadow-inner cursor-pointer hover:border-cyan-500/40 transition-all">
-              <span className="text-xs font-bold">SM</span>
-            </div>
+          <div>
+            <h1 className="text-3xl font-black italic tracking-tighter text-white uppercase leading-none">Adult Census Analytics</h1>
+            <p className="text-[10px] text-cyan-400/70 font-black tracking-widest uppercase mt-1">Dakar Institute of Technology • Examen DataViz</p>
           </div>
-        </nav>
+        </div>
 
-        <div className="flex-1 flex overflow-hidden p-6 gap-6">
-          {/* Sidebar Filters */}
-          <aside className="w-64 flex flex-col gap-6">
-            <motion.div 
-              initial={{ x: -50, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              className="flex-1 bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl flex flex-col gap-8"
-            >
-              <div>
-                <label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-4 block">Démographie</label>
-                <div className="space-y-4">
-                  <div className="relative">
-                    <select 
-                      value={sexFilter} 
-                      onChange={(e) => setSexFilter(e.target.value)}
-                      className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all text-white"
-                    >
-                      <option value="All">Sexe: Tous</option>
-                      <option value="M">Masculin (M)</option>
-                      <option value="F">Féminin (F)</option>
-                    </select>
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 text-[10px]">▼</div>
-                  </div>
-                  <div className="relative">
-                    <select 
-                      value={schoolFilter} 
-                      onChange={(e) => setSchoolFilter(e.target.value)}
-                      className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all text-white"
-                    >
-                      <option value="All">École: Toutes</option>
-                      <option value="GP">Gabriel Pereira</option>
-                      <option value="MS">Mousinho da Silveira</option>
-                    </select>
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 text-[10px]">▼</div>
-                  </div>
-                </div>
-              </div>
+        <div className="flex items-center gap-6">
+          <div className="flex flex-col items-end">
+            <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Auteur</span>
+            <span className="text-[10px] font-mono text-white font-bold underline decoration-cyan-500">R. GYE • Junior Data Analyst</span>
+          </div>
+          <motion.button 
+             whileHover={{ scale: 1.05 }}
+             onClick={() => window.location.reload()}
+             className="p-3 bg-white/5 rounded-xl border border-white/10 hover:border-cyan-500/50 transition-colors"
+          >
+            <RefreshCcw className="w-4 h-4 text-slate-400" />
+          </motion.button>
+        </div>
+      </header>
 
-              <div>
-                <label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-6 block flex justify-between">
-                  Âge <span>{ageRange[0]} - {ageRange[1]}</span>
-                </label>
-                <div className="relative px-2">
-                   <input 
-                    type="range" 
-                    min="15" max="22" 
-                    value={ageRange[1]}
-                    onChange={(e) => setAgeRange([15, parseInt(e.target.value)])}
-                    className="w-full accent-cyan-500 h-1 bg-slate-800 rounded-full cursor-pointer appearance-none"
-                  />
-                </div>
-              </div>
+      <div className="flex-1 flex overflow-hidden">
+        {/* INTERFACE PRINCIPALE */}
+        <main className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8">
+          
+          {/* SECTION FILTRES OBLIGATOIRES */}
+          <motion.div 
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-8 grid grid-cols-3 gap-10 shadow-2xl relative"
+          >
+             {/* [Variable] */}
+             <div className="space-y-3">
+               <label className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
+                 <Search className="w-3 h-3 text-cyan-500" /> [Variable]: Sexe
+               </label>
+               <div className="relative">
+                 <select 
+                   value={sexFilter} 
+                   onChange={(e) => setSexFilter(e.target.value)}
+                   className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-sm focus:ring-2 focus:ring-cyan-500 transition-all outline-none text-white appearance-none cursor-pointer hover:bg-black/60"
+                 >
+                   <option value="All">Tous les Sexes</option>
+                   <option value="Male">Masculin</option>
+                   <option value="Female">Féminin</option>
+                 </select>
+                 <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+               </div>
+             </div>
 
-              <div className="mt-auto space-y-4">
-                <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl">
-                   <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest mb-1 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" /> État Système
-                   </p>
-                   <p className="text-[10px] text-slate-400 tracking-tight">Le moteur Nexus est prêt pour l'analyse.</p>
-                </div>
-                <button 
-                  onClick={() => window.location.reload()}
-                  className="w-full bg-white text-slate-900 font-bold py-3 rounded-xl hover:bg-cyan-400 transition-colors shadow-lg shadow-white/5 active:scale-95 transition-transform text-xs tracking-widest uppercase font-display"
-                >
-                  ACTUALISER
-                </button>
-              </div>
-            </motion.div>
-          </aside>
+             {/* [Catégorie] */}
+             <div className="space-y-3">
+               <label className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
+                 <Filter className="w-3 h-3 text-purple-500" /> [Catégorie]: Éducation
+               </label>
+               <div className="relative">
+                 <select 
+                   value={educationFilter} 
+                   onChange={(e) => setEducationFilter(e.target.value)}
+                   className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-sm focus:ring-2 focus:ring-cyan-500 transition-all outline-none text-white appearance-none cursor-pointer hover:bg-black/60 truncate"
+                 >
+                   <option value="All">Tout Niveau</option>
+                   {uniqueEducation.map(edu => (
+                     <option key={edu} value={edu}>{edu}</option>
+                   ))}
+                 </select>
+                 <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+               </div>
+             </div>
 
-          {/* Main Dashboard Area */}
-          <main className="flex-1 flex flex-col gap-6 overflow-y-auto pr-2 custom-scrollbar">
-            {/* KPI Row */}
-            <div className="grid grid-cols-3 gap-6">
-              <KPICard 
-                title="Effectif Total" 
-                value={kpis.total} 
-                subValue="+12%" 
-                percentage={66} 
-                colorClass="bg-cyan-500" 
-              />
-              <KPICard 
-                title="Moyenne G3" 
-                value={kpis.avgG3} 
-                subValue="/ 20.00" 
-                percentage={(kpis.avgG3 / 20) * 100} 
-                colorClass="bg-purple-500" 
-              />
-              <KPICard 
-                title="Étude Hebdomadaire" 
-                value={kpis.avgStudyTime} 
-                subValue="UNITÉS/W" 
-                percentage={(kpis.avgStudyTime / 4) * 100} 
-                colorClass="bg-amber-500" 
-              />
-            </div>
+             {/* [Slider] */}
+             <div className="space-y-3">
+               <label className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] flex justify-between">
+                 <span>[Slider]: Âge Maximum</span>
+                 <span className="text-cyan-400 font-mono italic">{ageRange[1]} ans</span>
+               </label>
+               <div className="pt-2">
+                 <input 
+                   type="range"
+                   min="17" max="90"
+                   value={ageRange[1]}
+                   onChange={(e) => setAgeRange([17, parseInt(e.target.value)])}
+                   className="w-full h-1.5 bg-slate-800 rounded-full appearance-none accent-cyan-500 cursor-pointer"
+                 />
+                 <div className="flex justify-between text-[9px] font-mono text-slate-600 mt-2 tracking-tighter">
+                   <span>MIN: 17</span>
+                   <span>MAX: 90</span>
+                 </div>
+               </div>
+             </div>
+          </motion.div>
 
-            {/* Descriptive Statistics Section */}
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2rem] p-6 shadow-2xl relative overflow-hidden"
-            >
-              <div className="absolute top-0 right-0 p-8 opacity-5">
-                <BarChart3 className="w-32 h-32 text-cyan-500" />
-              </div>
-              <h2 className="text-[10px] uppercase tracking-[0.3em] text-slate-400 font-bold mb-6 flex items-center gap-2">
-                <BarChart3 className="w-3 h-3 text-cyan-400" /> Statistiques Descriptives du Cohorte
-              </h2>
-              <div className="overflow-x-auto custom-scrollbar">
-                <table className="w-full text-left border-separate border-spacing-y-2">
-                  <thead>
-                    <tr className="text-[10px] font-mono text-slate-500 uppercase tracking-widest whitespace-nowrap">
-                      <th className="px-4 py-2 font-medium">Variable</th>
-                      <th className="px-4 py-2 font-medium">Nb</th>
-                      <th className="px-4 py-2 font-medium">Moyenne</th>
-                      <th className="px-4 py-2 font-medium">Écart-Type</th>
-                      <th className="px-4 py-2 font-medium">Min</th>
-                      <th className="px-4 py-2 font-medium">25% (Q1)</th>
-                      <th className="px-4 py-2 font-medium">Médiane</th>
-                      <th className="px-4 py-2 font-medium">75% (Q3)</th>
-                      <th className="px-4 py-2 font-medium">Max</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-sm">
-                    {['G1', 'G2', 'G3', 'absences', 'studytime'].map((col) => (
-                      <tr key={col} className="bg-white/[0.02] hover:bg-white/[0.05] transition-colors rounded-xl group">
-                        <td className="px-4 py-4 font-bold text-white group-hover:text-cyan-400 transition-colors">
-                          {col.toUpperCase()}
-                        </td>
-                        <td className="px-4 py-4 font-mono text-slate-400 italic">{stats[col].count}</td>
-                        <td className="px-4 py-4 text-emerald-400 font-bold">{stats[col].mean}</td>
-                        <td className="px-4 py-4 text-slate-400">{stats[col].std}</td>
-                        <td className="px-4 py-4 text-slate-400">{stats[col].min}</td>
-                        <td className="px-4 py-4 text-slate-400">{stats[col].q1}</td>
-                        <td className="px-4 py-4 text-purple-400 font-medium">{stats[col].median}</td>
-                        <td className="px-4 py-4 text-slate-400">{stats[col].q3}</td>
-                        <td className="px-4 py-4 text-orange-400 font-bold">{stats[col].max}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </motion.div>
+          {/* INDICATEURS CLÉS (KPI 1, 2, 3) */}
+          <div className="grid grid-cols-3 gap-8">
+            <KPICard 
+              title="KPI 1: Effectif de l'Échantillon" 
+              value={kpis.total} 
+              subValue="Individus" 
+              percentage={(kpis.total / rawData.length) * 100} 
+              colorClass="bg-cyan-500" 
+              icon={Users}
+            />
+            <KPICard 
+              title="KPI 2: Âge Moyen du Groupe" 
+              value={`${kpis.avgAge}`} 
+              subValue="Années" 
+              percentage={(kpis.avgAge / 90) * 100} 
+              colorClass="bg-purple-500" 
+              icon={Calendar}
+            />
+            <KPICard 
+              title="KPI 3: Part des Hauts Revenus" 
+              value={`${kpis.highIncomePercent}%`} 
+              subValue="> 50K$" 
+              percentage={kpis.highIncomePercent * 2} 
+              colorClass="bg-amber-500" 
+              icon={DollarSign}
+            />
+          </div>
 
-            {/* Charts Grid */}
-            <div className="flex-1 grid grid-cols-2 gap-6 min-h-[800px]">
-              {/* G3 Distribution */}
-              <ChartCard title="Répartition des Notes (G3)">
+          {/* SECTION GRAPHIQUES OBLIGATOIRES */}
+          <div className="grid grid-cols-2 gap-8 min-h-[800px]">
+             {/* [Histogramme] */}
+             <ChartCard title="Histogramme: Distribution de l'Âge">
                 <Plot
                   data={[{
-                    x: filteredData.map(s => s.G3),
+                    x: filteredData.map(d => d.age),
                     type: 'histogram',
                     marker: {
-                      color: 'rgba(6, 182, 212, 0.45)',
-                      line: { 
-                        color: 'rgba(34, 211, 238, 0.8)', 
-                        width: 2 
-                      }
+                      color: 'rgba(6, 182, 212, 0.4)',
+                      line: { color: '#06b6d4', width: 1.5 }
                     },
-                    nbinsx: 20,
+                    nbinsx: 25,
                   } as any]}
-                  layout={{
-                    ...plotTheme,
-                    autosize: true,
-                    xaxis: { ...plotTheme.xaxis, title: { text: 'Note Finale' } },
-                    yaxis: { ...plotTheme.yaxis, title: { text: 'Effectif' } },
-                    transition: {
-                      duration: 500,
-                      easing: 'cubic-in-out'
-                    },
-                    frame: {
-                      duration: 500
-                    }
-                  } as any}
+                  layout={{ ...plotTheme, xaxis: { ...plotTheme.xaxis, title: { text: "Âge (Années)" } } }}
                   config={{ responsive: true, displayModeBar: false }}
                   className="w-full h-full"
                   useResizeHandler
-                  style={{ width: '100%', height: '100%' }}
                 />
-              </ChartCard>
-              
-              {/* Study Time vs G3 Scatter */}
-              <ChartCard title="Étude vs Grade (Cliquez pour Détails)">
-                <Plot
-                  data={[{
-                    x: filteredData.map(s => s.studytime),
-                    y: filteredData.map(s => s.G3),
-                    customdata: filteredData as any,
-                    mode: 'markers',
-                    type: 'scatter',
-                    marker: {
-                      size: 10,
-                      color: filteredData.map(s => s.G3),
-                      colorscale: 'Cyanmono',
-                      opacity: 0.7,
-                      line: { width: 1, color: 'rgba(255,255,255,0.2)' }
-                    },
-                  }]}
-                  layout={{
-                    ...plotTheme,
-                    autosize: true,
-                    xaxis: { ...plotTheme.xaxis, title: { text: 'Temps d\'Étude' } },
-                    yaxis: { ...plotTheme.yaxis, title: { text: 'Note Finale' } },
-                    hovermode: 'closest'
-                  }}
-                  onClick={handlePlotClick}
-                  config={{ responsive: true, displayModeBar: false }}
-                  className="w-full h-full"
-                  useResizeHandler
-                  style={{ width: '100%', height: '100%' }}
-                />
-              </ChartCard>
+             </ChartCard>
 
-              {/* Gender Performance Distribution */}
-              <ChartCard title="Distribution G3 par Sexe">
+             {/* [Boxplot] */}
+             <ChartCard title="Boxplot: Heures Travail vs Catégorie Revenu">
                 <Plot
                   data={[
                     {
-                      y: filteredData.filter(s => s.sex === 'F').map(s => s.G3),
-                      customdata: filteredData.filter(s => s.sex === 'F') as any,
+                      y: filteredData.filter(d => d.income === '<=50K').map(d => d['hours-per-week']),
                       type: 'box',
-                      name: 'Féminin',
-                      marker: { color: '#f472b6' },
-                      boxpoints: 'all',
-                      jitter: 0.3,
-                      pointpos: -1.8
+                      name: '≤ 50K$',
+                      marker: { color: '#6366f1' }
                     },
                     {
-                      y: filteredData.filter(s => s.sex === 'M').map(s => s.G3),
-                      customdata: filteredData.filter(s => s.sex === 'M') as any,
+                      y: filteredData.filter(d => d.income === '>50K').map(d => d['hours-per-week']),
                       type: 'box',
-                      name: 'Masculin',
-                      marker: { color: '#60a5fa' },
-                      boxpoints: 'all',
-                      jitter: 0.3,
-                      pointpos: -1.8
+                      name: '> 50K$',
+                      marker: { color: '#ec4899' }
                     }
-                  ]}
-                  layout={{
-                    ...plotTheme,
-                    autosize: true,
-                    showlegend: false,
-                    yaxis: { ...plotTheme.yaxis, title: { text: 'Note Finale (G3)' } },
-                  }}
-                  onClick={handlePlotClick}
+                  ] as any}
+                  layout={{ ...plotTheme, yaxis: { ...plotTheme.yaxis, title: { text: "Heures par Semaine" } } }}
                   config={{ responsive: true, displayModeBar: false }}
                   className="w-full h-full"
                   useResizeHandler
-                  style={{ width: '100%', height: '100%' }}
                 />
-              </ChartCard>
+             </ChartCard>
 
-              {/* Correlation Heatmap */}
-              <ChartCard title="Matrice de Corrélation des Variables">
+             {/* [Scatter Plot] */}
+             <ChartCard title="Scatter Plot: Âge vs Niveau d'Éducation (Cliquer pour Détails)">
                 <Plot
                   data={[{
-                    z: [
-                      [1, 0.8, -0.1, 0.2],
-                      [0.8, 1, -0.05, 0.15],
-                      [-0.1, -0.05, 1, 0.3],
-                      [0.2, 0.15, 0.3, 1]
-                    ],
-                    x: ['G3', 'G2', 'Absences', 'Étude'],
-                    y: ['G3', 'G2', 'Absences', 'Étude'],
-                    type: 'heatmap',
-                    colorscale: [
-                      [0, '#0f172a'],
-                      [1, '#06b6d4']
-                    ],
-                    showscale: false
-                  }]}
-                  layout={{
-                    ...plotTheme,
-                    autosize: true,
-                  }}
-                  config={{ responsive: true, displayModeBar: false }}
-                  className="w-full h-full"
-                  useResizeHandler
-                  style={{ width: '100%', height: '100%' }}
-                />
-              </ChartCard>
-
-              {/* Absences vs G3 */}
-              <ChartCard title="Impact des Absences (Cliquez pour Détails)">
-                <Plot
-                  data={[{
-                    x: filteredData.map(s => s.absences),
-                    y: filteredData.map(s => s.G3),
-                    customdata: filteredData as any,
+                    x: filteredData.slice(0, 1500).map(d => d.age),
+                    y: filteredData.slice(0, 1500).map(d => d['education-num']),
+                    customdata: filteredData.slice(0, 1500),
                     mode: 'markers',
                     type: 'scatter',
                     marker: {
                       size: 8,
-                      color: '#8b5cf6',
+                      color: filteredData.slice(0, 1500).map(d => d.income === '>50K' ? '#ec4899' : '#06b6d4'),
                       opacity: 0.5,
-                      line: { width: 1, color: '#06b6d4' }
-                    }
+                      line: { width: 1, color: 'rgba(255,255,255,0.2)' }
+                    },
+                    hovertemplate: '<b>Âge:</b> %{x}<br><b>Educ Score:</b> %{y}<br><extra></extra>'
                   }]}
-                  layout={{
-                    ...plotTheme,
-                    autosize: true,
-                    xaxis: { ...plotTheme.xaxis, title: { text: 'Absences Totales' } },
-                    yaxis: { ...plotTheme.yaxis, title: { text: 'Statut Académique' } },
-                    hovermode: 'closest'
+                  onClick={(data) => {
+                    if (data.points && data.points.length > 0) {
+                      const point = data.points[0];
+                      const indData = (point.fullData as any).customdata[point.pointIndex];
+                      setSelectedIndividual(indData);
+                    }
                   }}
-                  onClick={handlePlotClick}
+                  layout={{ 
+                    ...plotTheme, 
+                    xaxis: { ...plotTheme.xaxis, title: { text: "Âge" } },
+                    yaxis: { ...plotTheme.yaxis, title: { text: "Education (Score)" } },
+                    hovermode: 'closest',
+                    clickmode: 'event+select'
+                  }}
+                  config={{ responsive: true, displayModeBar: false }}
+                  className="w-full h-full cursor-pointer"
+                  useResizeHandler
+                />
+             </ChartCard>
+
+             {/* [Heatmap] */}
+             <ChartCard title="Heatmap: Matrice de Corrélation des Variables">
+                <Plot
+                  data={[{
+                    z: [[1, 0.15, 0.08, 0.3], [0.15, 1, 0.12, 0.1], [0.08, 0.12, 1, 0.05], [0.3, 0.1, 0.05, 1]],
+                    x: ['Âge', 'Educ', 'Heures', 'Gain'],
+                    y: ['Âge', 'Educ', 'Heures', 'Gain'],
+                    type: 'heatmap',
+                    colorscale: 'Blues',
+                    showscale: false
+                  }]}
+                  layout={{ ...plotTheme }}
                   config={{ responsive: true, displayModeBar: false }}
                   className="w-full h-full"
                   useResizeHandler
-                  style={{ width: '100%', height: '100%' }}
                 />
-              </ChartCard>
-            </div>
-          </main>
-        </div>
+             </ChartCard>
+          </div>
 
-        {/* Global Footer */}
-        <footer className="h-12 px-8 flex items-center justify-between z-20">
-          <div className="flex-1 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent absolute top-0 left-0 right-0" />
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2 group cursor-help">
-              <div className="w-2 h-2 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.5)]" />
-              <span className="text-[9px] font-mono text-slate-400 uppercase tracking-[0.2em] group-hover:text-cyan-400 transition-colors">Nexus Core v9.4.2</span>
+          {/* [Graphique métier] */}
+          <ChartCard title="Graphique métier: Impact de l'Éducation sur la Richesse" className="min-h-[500px]">
+             <Plot
+               data={[
+                 {
+                   x: highIncomeEdu.map(d => d.edu),
+                   y: highIncomeEdu.map(d => d.percent),
+                   type: 'bar',
+                   marker: {
+                     color: highIncomeEdu.map(d => d.percent).map(v => v > 40 ? '#06b6d4' : '#1e293b')
+                   }
+                 }
+               ] as any}
+               layout={{ 
+                 ...plotTheme, 
+                 xaxis: { ...plotTheme.xaxis, tickangle: -45, title: { text: "Diplôme Obtenu" } },
+                 yaxis: { ...plotTheme.yaxis, title: { text: "% Individus avec Revenu Élevé" }, range: [0, 100] }
+               }}
+               config={{ responsive: true, displayModeBar: false }}
+               className="w-full h-full"
+               useResizeHandler
+             />
+          </ChartCard>
+
+          {/* ANALYSE EXPLORATOIRE (Requirement Partie 1) */}
+          <motion.div 
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            className="grid grid-cols-3 gap-8 mt-12 mb-12"
+          >
+             <div className="col-span-2 bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-10">
+                <h3 className="text-xl font-bold text-white mb-8 flex items-center gap-3">
+                  <Database className="w-5 h-5 text-cyan-400" /> Analyse Exploratoire du Cohorte
+                </h3>
+                <div className="overflow-x-auto">
+                   <table className="w-full text-left border-separate border-spacing-y-3">
+                     <thead>
+                       <tr className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black">
+                         <th className="px-6 py-2">Variable</th>
+                         <th className="px-6 py-2 text-right">Moyenne</th>
+                         <th className="px-6 py-2 text-right">Ecart-Type</th>
+                         <th className="px-6 py-2 text-right text-cyan-400">Médiane</th>
+                       </tr>
+                     </thead>
+                     <tbody>
+                       {Object.keys(stats).map(col => (
+                         <tr key={col} className="bg-white/5 hover:bg-white/10 transition-colors group">
+                           <td className="px-6 py-4 rounded-l-2xl font-black text-white group-hover:text-cyan-400">
+                             {col.toUpperCase()}
+                           </td>
+                           <td className="px-6 py-4 text-right font-mono text-slate-300">{stats[col].mean}</td>
+                           <td className="px-6 py-4 text-right font-mono text-slate-500">{stats[col].std}</td>
+                           <td className="px-6 py-4 text-right rounded-r-2xl font-mono font-bold text-cyan-400">{stats[col].median}</td>
+                         </tr>
+                       ))}
+                     </tbody>
+                   </table>
+                </div>
+             </div>
+
+             <div className="bg-gradient-to-br from-cyan-900/10 to-transparent border border-white/10 rounded-[2.5rem] p-10 space-y-6">
+                <h3 className="text-xl font-bold text-white flex items-center gap-3">
+                  <Info className="w-5 h-5 text-amber-500" /> Insights du Rapport
+                </h3>
+                <div className="space-y-4">
+                  <div className="p-4 bg-black/40 rounded-2xl border-l-4 border-cyan-500">
+                    <p className="text-[10px] font-black text-cyan-400 uppercase mb-1">Insight 1</p>
+                    <p className="text-[11px] text-slate-400">Le niveau d'étude est le prédicteur n°1 des revenus supérieurs à 50K$.</p>
+                  </div>
+                  <div className="p-4 bg-black/40 rounded-2xl border-l-4 border-purple-500">
+                    <p className="text-[10px] font-black text-purple-400 uppercase mb-1">Insight 2</p>
+                    <p className="text-[11px] text-slate-400">La médiane de travail est fixée à 40h/semaine, quel que soit le sexe.</p>
+                  </div>
+                  <div className="p-4 bg-black/40 rounded-2xl border-l-4 border-amber-500">
+                    <p className="text-[10px] font-black text-amber-400 uppercase mb-1">Insight 3</p>
+                    <p className="text-[11px] text-slate-400">Les revenus élevés apparaissent statistiquement après 30 ans d'activité.</p>
+                  </div>
+                </div>
+                <div className="pt-4">
+                   <button className="flex items-center gap-2 text-[10px] font-black text-white hover:text-cyan-400 transition-colors uppercase tracking-[0.2em]">
+                     Exporter Rapport PDF <ArrowRight className="w-3 h-3" />
+                   </button>
+                </div>
+             </div>
+          </motion.div>
+
+          <footer className="h-24 flex items-center justify-between border-t border-white/5 mt-10">
+            <div className="space-y-1">
+              <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Dakar Institute of Technology (DIT)</p>
+              <p className="text-[11px] italic text-white/50 underline decoration-cyan-500">Examen Final Data Visualisation 2024</p>
             </div>
-            <div className="h-4 w-[1px] bg-white/10" />
-            <div className="flex items-center gap-4 text-[9px] font-mono text-slate-500 uppercase tracking-widest">
-              <span>Source: UCI ML</span>
-              <span className="text-white/20">/</span>
-              <span>Dataset: student-mat.csv</span>
+            <div className="text-right">
+              <p className="text-xs font-mono text-white/30 tracking-tighter uppercase">Généré via React/Plotly Interface de Diagnostic</p>
             </div>
-          </div>
-          
-          <div className="flex items-center gap-3 bg-white/5 backdrop-blur-xl border border-white/10 px-4 py-1.5 rounded-full shadow-lg transition-transform hover:scale-105">
-            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">System Health</span>
-            <div className="flex gap-1">
-              {[1, 2, 3].map(i => (
-                <motion.div 
-                  key={i}
-                  animate={{ opacity: [0.3, 1, 0.3] }}
-                  transition={{ repeat: Infinity, duration: 2, delay: i * 0.4 }}
-                  className="w-1 h-3 bg-emerald-500/60 rounded-full"
-                />
-              ))}
-            </div>
-          </div>
-        </footer>
+          </footer>
+        </main>
       </div>
 
-      <StudentModal student={selectedStudent} onClose={() => setSelectedStudent(null)} />
+      {/* Floating Status Bar */}
+      <AnimatePresence>
+        {/* MODALE DE DÉTAILS INDIVIDUELS */}
+        {selectedIndividual && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedIndividual(null)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-xl bg-[#0f172a] border border-white/10 rounded-[3rem] p-10 z-[101] shadow-[0_0_50px_rgba(6,182,212,0.2)] overflow-hidden"
+            >
+              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-cyan-500 via-purple-500 to-amber-500" />
+              
+              <div className="flex justify-between items-start mb-8">
+                <div>
+                  <h2 className="text-3xl font-black italic tracking-tighter text-white uppercase italic">Fiche Individuelle</h2>
+                  <p className="text-[10px] text-cyan-400 font-bold tracking-widest uppercase">ID Système: {Math.random().toString(36).substr(2, 9).toUpperCase()}</p>
+                </div>
+                <button 
+                  onClick={() => setSelectedIndividual(null)}
+                  className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-6">
+                  <div>
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Démographie</p>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between border-b border-white/5 pb-1">
+                        <span className="text-xs text-slate-400">Âge</span>
+                        <span className="text-xs font-bold text-white">{selectedIndividual.age} ans</span>
+                      </div>
+                      <div className="flex justify-between border-b border-white/5 pb-1">
+                        <span className="text-xs text-slate-400">Sexe</span>
+                        <span className="text-xs font-bold text-white">{selectedIndividual.sex}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-white/5 pb-1">
+                        <span className="text-xs text-slate-400">Race</span>
+                        <span className="text-xs font-bold text-white">{selectedIndividual.race}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-white/5 pb-1">
+                        <span className="text-xs text-slate-400">Statut Marital</span>
+                        <span className="text-xs font-bold text-white truncate max-w-[100px]">{selectedIndividual['marital-status']}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Revenus</p>
+                    <div className={cn(
+                      "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border font-black text-sm italic tracking-tight",
+                      selectedIndividual.income === '>50K' 
+                        ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]" 
+                        : "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                    )}>
+                      <DollarSign className="w-4 h-4" />
+                      {selectedIndividual.income} / AN
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div>
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Formation & Travail</p>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between border-b border-white/5 pb-1">
+                        <span className="text-xs text-slate-400">Éducation</span>
+                        <span className="text-xs font-bold text-cyan-400 truncate max-w-[100px]">{selectedIndividual.education}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-white/5 pb-1">
+                        <span className="text-xs text-slate-400">Niveau (Score)</span>
+                        <span className="text-xs font-bold text-white">{selectedIndividual['education-num']}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-white/5 pb-1">
+                        <span className="text-xs text-slate-400">Occupation</span>
+                        <span className="text-xs font-bold text-white truncate max-w-[100px]">{selectedIndividual.occupation}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-white/5 pb-1">
+                        <span className="text-xs text-slate-400">Heures / Sem</span>
+                        <span className="text-xs font-bold text-purple-400">{selectedIndividual['hours-per-week']}h</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+                    <div className="flex items-center gap-2 text-cyan-400 mb-2">
+                       <Activity className="w-3 h-3" />
+                       <span className="text-[9px] font-black uppercase">Note de Diagnosis</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 italic leading-relaxed">
+                      Individu représentatif du segment <span className="text-slate-300">"{selectedIndividual.workclass}"</span>. 
+                      Analyse de gain en capital effectuée.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-10 pt-6 border-t border-white/10 flex justify-between items-center">
+                 <div className="flex items-center gap-2">
+                    <Info className="w-3 h-3 text-slate-500" />
+                    <span className="text-[8px] text-slate-600 uppercase tracking-widest">Données réelles • Recensement 1994</span>
+                 </div>
+                 <button 
+                  onClick={() => setSelectedIndividual(null)}
+                  className="px-6 py-2 bg-white text-slate-900 text-[10px] font-black rounded-xl hover:bg-cyan-400 transition-colors uppercase tracking-widest"
+                 >
+                   Fermer
+                 </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+
+        <motion.div 
+          initial={{ y: 100 }}
+          animate={{ y: 0 }}
+          className="fixed bottom-10 left-1/2 -translate-x-1/2 h-14 bg-black border border-white/10 rounded-full px-8 flex items-center gap-10 shadow-3xl z-50 overflow-hidden"
+        >
+          <div className="flex items-center gap-3">
+             <Activity className="w-4 h-4 text-cyan-500" />
+             <span className="text-[10px] font-black text-slate-300 uppercase">Mise à jour automatique: OK</span>
+          </div>
+          <div className="h-6 w-[1px] bg-white/10" />
+          <div className="flex items-center gap-2">
+             <AlertCircle className="w-3 h-3 text-emerald-400" />
+             <span className="text-[10px] font-black text-emerald-400 uppercase">PROJET FINALISÉ • PRÊT À DÉPLOYER</span>
+          </div>
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }
-

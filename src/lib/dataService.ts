@@ -1,86 +1,114 @@
+/**
+ * SERVICE DE DONNÉES - ADULT CENSUS INCOME (UCI)
+ * Ce fichier gère la récupération, le filtrage et les calculs statistiques
+ * pour l'examen de Data Visualisation du DIT.
+ */
+
 import Papa from 'papaparse';
 
-export interface Student {
-  school: string;
-  sex: 'F' | 'M';
+export interface AdultData {
   age: number;
-  address: 'U' | 'R';
-  famsize: 'LE3' | 'GT3';
-  Pstatus: 'T' | 'A';
-  Medu: number;
-  Fedu: number;
-  studytime: number;
-  failures: number;
-  schoolsup: 'yes' | 'no';
-  famsup: 'yes' | 'no';
-  paid: 'yes' | 'no';
-  activities: 'yes' | 'no';
-  nursery: 'yes' | 'no';
-  higher: 'yes' | 'no';
-  internet: 'yes' | 'no';
-  romantic: 'yes' | 'no';
-  famrel: number;
-  freetime: number;
-  goout: number;
-  Dalc: number;
-  Walc: number;
-  health: number;
-  absences: number;
-  G1: number;
-  G2: number;
-  G3: number;
+  workclass: string;
+  fnlwgt: number;
+  education: string;
+  'education-num': number;
+  'marital-status': string;
+  occupation: string;
+  relationship: string;
+  race: string;
+  sex: string;
+  'capital-gain': number;
+  'capital-loss': number;
+  'hours-per-week': number;
+  'native-country': string;
+  income: string;
   [key: string]: any;
 }
 
-const DATA_URL = 'https://raw.githubusercontent.com/jbrownlee/Datasets/master/student-mat.csv';
+// URL du dataset source (GitHub raw pour éviter les erreurs CORS/Blocking)
+const ADULT_DATA_URL = 'https://raw.githubusercontent.com/jbrownlee/Datasets/master/adult-all.csv';
 
-export async function fetchStudentData(): Promise<Student[]> {
+// Headers par défaut si le CSV n'en possède pas (fallback)
+const HEADERS = [
+  'age', 'workclass', 'fnlwgt', 'education', 'education-num',
+  'marital-status', 'occupation', 'relationship', 'race', 'sex',
+  'capital-gain', 'capital-loss', 'hours-per-week', 'native-country', 'income'
+];
+
+/**
+ * Récupère les données depuis la source et effectue un nettoyage complet.
+ */
+export async function fetchAdultData(): Promise<AdultData[]> {
   try {
-    const response = await fetch(DATA_URL);
+    const response = await fetch(ADULT_DATA_URL);
+    if (!response.ok) throw new Error(`Erreur HTTP: ${response.status}`);
     const csvData = await response.text();
     
-    // The dataset might use ',' or ';'. Papaparse handles it, but let's be safe.
+    // Détection dynamique des en-têtes
+    const firstLine = csvData.split('\n')[0].toLowerCase();
+    const hasHeaders = firstLine.includes('age') || firstLine.includes('workclass');
+
     const results = Papa.parse(csvData, {
-      header: true,
+      header: hasHeaders,
       dynamicTyping: true,
       skipEmptyLines: true,
     });
 
-    return results.data as Student[];
+    // Uniformisation des données (nettoyage des chaînes et normalisation)
+    const data = hasHeaders ? results.data : results.data.map((row: any) => {
+      const obj: any = {};
+      HEADERS.forEach((header, index) => { obj[header] = row[index]; });
+      return obj;
+    });
+
+    return (data as any[]).map((row: any) => {
+      const cleanObj: any = {};
+      Object.keys(row).forEach(key => {
+        if (!key) return;
+        const normalizedKey = key.trim().toLowerCase().replace(/"/g, '');
+        let val = row[key];
+        
+        // Nettoyage des chaînes (suppression des espaces en trop et points UCI)
+        if (typeof val === 'string') {
+          val = val.trim().replace(/"/g, '').replace(/\.$/, '');
+        }
+        
+        // Mapping des colonnes cibles (Label/Income)
+        let k = normalizedKey;
+        if (normalizedKey === 'income' || normalizedKey === 'label' || normalizedKey === 'class' || normalizedKey === 'target') {
+          k = 'income';
+          // Normalisation des classes binaires
+          if (val === '0' || val === '<=50k') val = '<=50K';
+          if (val === '1' || val === '>50k') val = '>50K';
+        }
+        
+        cleanObj[k] = val;
+      });
+      return cleanObj as AdultData;
+    });
   } catch (error) {
-    console.error('Error fetching student data:', error);
+    console.error('Erreur lors du chargement des données:', error);
     return [];
   }
 }
 
-export function filterData(
-  data: Student[],
+/**
+ * Filtre les données selon les sélections de l'utilisateur (Dropdowns & Slider).
+ */
+export function filterAdultData(
+  data: AdultData[],
   filters: {
     sex?: string;
-    school?: string;
+    education?: string;
     ageRange?: [number, number];
   }
-): Student[] {
-  return data.filter((s) => {
-    if (filters.sex && s.sex !== filters.sex) return false;
-    if (filters.school && s.school !== filters.school) return false;
-    if (filters.ageRange && (s.age < filters.ageRange[0] || s.age > filters.ageRange[1])) return false;
+): AdultData[] {
+  return data.filter((d) => {
+    if (filters.sex && d.sex !== filters.sex) return false;
+    if (filters.education && d.education !== filters.education) return false;
+    if (filters.ageRange && (d.age < filters.ageRange[0] || d.age > filters.ageRange[1])) return false;
     return true;
   });
-}
-
-export function calculateKPIs(data: Student[]) {
-  if (data.length === 0) return { total: 0, avgG3: 0, avgStudyTime: 0 };
-
-  const total = data.length;
-  const avgG3 = data.reduce((acc, curr) => acc + curr.G3, 0) / total;
-  const avgStudyTime = data.reduce((acc, curr) => acc + curr.studytime, 0) / total;
-
-  return {
-    total,
-    avgG3: Number(avgG3.toFixed(2)),
-    avgStudyTime: Number(avgStudyTime.toFixed(2)),
-  };
 }
 
 export interface DescriptiveStats {
@@ -94,10 +122,34 @@ export interface DescriptiveStats {
   max: number;
 }
 
-export function calculateDetailedStats(data: Student[], column: string): DescriptiveStats {
-  const values = data.map(s => s[column]).filter(v => typeof v === 'number').sort((a, b) => a - b);
-  const count = values.length;
+/**
+ * Calcule les indicateurs clés (KPIs).
+ */
+export function calculateAdultKPIs(data: AdultData[]) {
+  if (data.length === 0) return { total: 0, avgAge: 0, highIncomePercent: 0 };
+
+  const total = data.length;
+  const avgAge = data.reduce((acc, curr) => acc + (curr.age || 0), 0) / total;
+  const highIncomeCount = data.filter(d => d.income === '>50K').length;
+  const highIncomePercent = (highIncomeCount / total) * 100;
+
+  return {
+    total,
+    avgAge: Number(avgAge.toFixed(1)),
+    highIncomePercent: Number(highIncomePercent.toFixed(1)),
+  };
+}
+
+/**
+ * Calcule les statistiques descriptives pour une colonne donnée.
+ */
+export function calculateDetailedStats(data: AdultData[], column: string): DescriptiveStats {
+  const values = data
+    .map(d => d[column])
+    .filter(v => typeof v === 'number' && !isNaN(v))
+    .sort((a, b) => a - b);
   
+  const count = values.length;
   if (count === 0) return { count: 0, mean: 0, std: 0, min: 0, q1: 0, median: 0, q3: 0, max: 0 };
 
   const sum = values.reduce((a, b) => a + b, 0);
@@ -110,11 +162,9 @@ export function calculateDetailedStats(data: Student[], column: string): Descrip
     const pos = (count - 1) * p;
     const base = Math.floor(pos);
     const rest = pos - base;
-    if (values[base + 1] !== undefined) {
-      return values[base] + rest * (values[base + 1] - values[base]);
-    } else {
-      return values[base];
-    }
+    return values[base + 1] !== undefined 
+      ? values[base] + rest * (values[base + 1] - values[base]) 
+      : values[base];
   };
 
   return {
