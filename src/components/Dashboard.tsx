@@ -34,8 +34,14 @@ function cn(...inputs: ClassValue[]) {
 
 const KPICard = ({ title, value, subValue, percentage, colorClass }: { title: string, value: string | number, subValue: string, percentage: number, colorClass: string }) => (
   <motion.div 
-    whileHover={{ y: -5, border: '1px solid rgba(255,255,255,0.2)' }}
-    className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-5 shadow-xl group transition-all"
+    whileHover={{ 
+      y: -8, 
+      scale: 1.02, 
+      borderColor: colorClass.includes('cyan') ? 'rgba(6,182,212,0.5)' : colorClass.includes('purple') ? 'rgba(168,85,247,0.5)' : 'rgba(245,158,11,0.5)',
+      boxShadow: colorClass.includes('cyan') ? '0 25px 50px -12px rgba(0,0,0,0.8), 0 0 20px rgba(6,182,212,0.15)' : colorClass.includes('purple') ? '0 25px 50px -12px rgba(0,0,0,0.8), 0 0 20px rgba(168,85,247,0.15)' : '0 25px 50px -12px rgba(0,0,0,0.8), 0 0 20px rgba(245,158,11,0.15)'
+    }}
+    transition={{ type: 'spring', stiffness: 400, damping: 22 }}
+    className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-5 shadow-xl group cursor-default transition-colors duration-500"
   >
     <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold mb-1">{title}</p>
     <div className="flex items-baseline gap-2">
@@ -429,8 +435,11 @@ export default function Dashboard() {
                     x: filteredData.map(s => s.G3),
                     type: 'histogram',
                     marker: {
-                      color: 'rgba(6, 182, 212, 0.4)',
-                      line: { color: 'rgba(6, 182, 212, 1)', width: 1.5 }
+                      color: 'rgba(6, 182, 212, 0.45)',
+                      line: { 
+                        color: 'rgba(34, 211, 238, 0.8)', 
+                        width: 2 
+                      }
                     },
                     nbinsx: 20,
                   } as any]}
@@ -439,7 +448,14 @@ export default function Dashboard() {
                     autosize: true,
                     xaxis: { ...plotTheme.xaxis, title: { text: 'Note Finale' } },
                     yaxis: { ...plotTheme.yaxis, title: { text: 'Effectif' } },
-                  }}
+                    transition: {
+                      duration: 500,
+                      easing: 'cubic-in-out'
+                    },
+                    frame: {
+                      duration: 500
+                    }
+                  } as any}
                   config={{ responsive: true, displayModeBar: false }}
                   className="w-full h-full"
                   useResizeHandler
@@ -453,7 +469,7 @@ export default function Dashboard() {
                   data={[{
                     x: filteredData.map(s => s.studytime),
                     y: filteredData.map(s => s.G3),
-                    customdata: filteredData,
+                    customdata: filteredData as any,
                     mode: 'markers',
                     type: 'scatter',
                     marker: {
@@ -485,7 +501,7 @@ export default function Dashboard() {
                   data={[
                     {
                       y: filteredData.filter(s => s.sex === 'F').map(s => s.G3),
-                      customdata: filteredData.filter(s => s.sex === 'F'),
+                      customdata: filteredData.filter(s => s.sex === 'F') as any,
                       type: 'box',
                       name: 'Féminin',
                       marker: { color: '#f472b6' },
@@ -495,7 +511,7 @@ export default function Dashboard() {
                     },
                     {
                       y: filteredData.filter(s => s.sex === 'M').map(s => s.G3),
-                      customdata: filteredData.filter(s => s.sex === 'M'),
+                      customdata: filteredData.filter(s => s.sex === 'M') as any,
                       type: 'box',
                       name: 'Masculin',
                       marker: { color: '#60a5fa' },
@@ -554,7 +570,7 @@ export default function Dashboard() {
                   data={[{
                     x: filteredData.map(s => s.absences),
                     y: filteredData.map(s => s.G3),
-                    customdata: filteredData,
+                    customdata: filteredData as any,
                     mode: 'markers',
                     type: 'scatter',
                     marker: {
