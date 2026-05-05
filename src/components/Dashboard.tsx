@@ -2,6 +2,10 @@
  * COMPOSANT PRINCIPAL - DASHBOARD DIT
  * Ce dashboard a été conçu pour l'examen de Data Visualisation du DIT.
  * Stack: React, Tailwind CSS, Framer Motion, Plotly.js.
+ * 
+ * NOTE: Aucune IA n'est utilisée. Tous les insights et analyses sont
+ * générés par des calculs statistiques purs (moyennes, médianes, écarts-types,
+ * corrélations de Pearson, distributions, etc.)
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -23,10 +27,23 @@ import {
   RefreshCcw,
   Search,
   Database,
-  ArrowRight
+  ArrowRight,
+  TrendingUp,
+  Clock,
+  PieChart
 } from 'lucide-react';
-import { fetchAdultData, filterAdultData, calculateAdultKPIs, calculateDetailedStats, calculateCorrelationMatrix, AdultData } from '../lib/dataService';
-import { GoogleGenAI } from '@google/genai';
+import { 
+  fetchAdultData, 
+  filterAdultData, 
+  calculateAdultKPIs, 
+  calculateDetailedStats, 
+  calculateCorrelationMatrix, 
+  generateStatisticalInsights,
+  calculateCategoryDistribution,
+  calculateIncomeByAgeGroup,
+  calculateCV,
+  AdultData 
+} from '../lib/dataService';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -91,14 +108,6 @@ export default function Dashboard() {
   const [selectedIndividual, setSelectedIndividual] = useState<AdultData | null>(null);
   const [selectedIndividualId] = useState<string>(() => Math.random().toString(36).substr(2, 9).toUpperCase());
 
-  // État pour les insights Gemini AI
-  const [aiInsights, setAiInsights] = useState<string[]>([
-    "Le niveau d'étude est le prédicteur n°1 des revenus supérieurs à 50K$.",
-    "La médiane de travail est fixée à 40h/semaine, quel que soit le sexe.",
-    "Les revenus élevés apparaissent statistiquement après 30 ans d'activité.",
-  ]);
-  const [aiLoading, setAiLoading] = useState(false);
-
   // Filtres Requis par le template (Variable, Catégorie, Slider)
   const [sexFilter, setSexFilter] = useState<string>('All');
   const [educationFilter, setEducationFilter] = useState<string>('All');
@@ -153,7 +162,7 @@ export default function Dashboard() {
     [filteredData]
   );
 
-  // Calcul du % de hauts revenus par niveau d'éducation (utilisé pour le graphique et les insights AI)
+  // Calcul du % de hauts revenus par niveau d'éducation
   const highIncomeEdu = useMemo(() => {
     return uniqueEducation.map(edu => {
       const subset = filteredData.filter(d => d.education === edu);
@@ -162,39 +171,43 @@ export default function Dashboard() {
     }).sort((a, b) => b.percent - a.percent);
   }, [filteredData, uniqueEducation]);
 
-  // Génère des insights via Gemini AI
-  async function generateAiInsights() {
-    setAiLoading(true);
-    try {
-      const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || (import.meta as any).env?.GEMINI_API_KEY;
-      if (!apiKey) throw new Error('Clé API Gemini manquante');
-      const ai = new GoogleGenAI({ apiKey });
-      const kpisSnap = calculateAdultKPIs(filteredData);
-      const topEdu = highIncomeEdu.slice(0, 3).map(e => `${e.edu}: ${e.percent.toFixed(1)}%`).join(', ');
-      const prompt = `Tu es un data analyst. Voici des statistiques sur le recensement adulte UCI (filtres appliqués: sexe=${sexFilter}, éducation=${educationFilter}, âge max=${ageRange[1]}).
-- Effectif: ${kpisSnap.total} individus
-- Âge moyen: ${kpisSnap.avgAge} ans
-- Part hauts revenus (>50K$): ${kpisSnap.highIncomePercent}%
-- Top éducations par % hauts revenus: ${topEdu}
+  // Insights purement statistiques (aucune IA)
+  const statisticalInsights = useMemo(() => {
+    return generateStatisticalInsights(filteredData, kpis, highIncomeEdu);
+  }, [filteredData, kpis, highIncomeEdu]);
 
-Génère exactement 3 insights analytiques concis (1 phrase chacun, en français) sur ces données. 
-Réponds avec uniquement 3 lignes numérotées "1. ...", "2. ...", "3. ...".`;
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
-        contents: prompt,
-      });
-      const text = response.text || '';
-      const lines = text.split('\n')
-        .map((l: string) => l.replace(/^\d+\.\s*/, '').trim())
-        .filter((l: string) => l.length > 10)
-        .slice(0, 3);
-      if (lines.length === 3) setAiInsights(lines);
-    } catch (e) {
-      console.error('Gemini error:', e);
-    } finally {
-      setAiLoading(false);
-    }
-  }
+  // Distribution par catégorie de travail
+  const occupationDist = useMemo(() => {
+    return calculateCategoryDistribution(filteredData, 'occupation').slice(0, 10);
+  }, [filteredData]);
+
+  // Taux de hauts revenus par tranche d'âge
+  const incomeByAge = useMemo(() => {
+    return calculateIncomeByAgeGroup(filteredData);
+  }, [filteredData]);
+
+  // KPIs supplémentaires
+  const extraKpis = useMemo(() => {
+    const hoursStats = calculateDetailedStats(filteredData, 'hours-per-week');
+    const cvAge = calculateCV(filteredData, 'age');
+    const maleCount = filteredData.filter(d => d.sex === 'Male').length;
+    const femaleCount = filteredData.filter(d => d.sex === 'Female').length;
+    const topOccupation = occupationDist.length > 0 ? occupationDist[0].category : 'N/A';
+    return {
+      medianHours: hoursStats.median,
+      cvAge,
+      malePercent: filteredData.length > 0 ? ((maleCount / filteredData.length) * 100).toFixed(1) : '0',
+      femalePercent: filteredData.length > 0 ? ((femaleCount / filteredData.length) * 100).toFixed(1) : '0',
+      topOccupation,
+    };
+  }, [filteredData, occupationDist]);
+
+  // Distribution des revenus (pie chart data)
+  const incomeDistribution = useMemo(() => {
+    const high = filteredData.filter(d => d.income === '>50K').length;
+    const low = filteredData.filter(d => d.income === '<=50K').length;
+    return { high, low };
+  }, [filteredData]);
 
   // Export du rapport en PDF via impression navigateur
   function exportPDF() {
@@ -250,14 +263,14 @@ Réponds avec uniquement 3 lignes numérotées "1. ...", "2. ...", "3. ...".`;
           </div>
           <div>
             <h1 className="text-3xl font-black italic tracking-tighter text-white uppercase leading-none">Adult Census Analytics</h1>
-            <p className="text-[10px] text-cyan-400/70 font-black tracking-widest uppercase mt-1">Dakar Institute of Technology • Examen DataViz</p>
+            <p className="text-[10px] text-cyan-400/70 font-black tracking-widest uppercase mt-1">Dakar Institute of Technology -- Examen DataViz</p>
           </div>
         </div>
 
         <div className="flex items-center gap-6">
           <div className="flex flex-col items-end">
             <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Auteur</span>
-            <span className="text-[10px] font-mono text-white font-bold underline decoration-cyan-500">R. GYE • Junior Data Analyst</span>
+            <span className="text-[10px] font-mono text-white font-bold underline decoration-cyan-500">R. GYE -- Junior Data Analyst</span>
           </div>
           <motion.button 
              whileHover={{ scale: 1.05 }}
@@ -365,6 +378,34 @@ Réponds avec uniquement 3 lignes numérotées "1. ...", "2. ...", "3. ...".`;
               percentage={kpis.highIncomePercent * 2} 
               colorClass="bg-amber-500" 
               icon={DollarSign}
+            />
+          </div>
+
+          {/* INDICATEURS SUPPLÉMENTAIRES (KPI 4, 5, 6) */}
+          <div className="grid grid-cols-3 gap-8">
+            <KPICard 
+              title="KPI 4: Médiane Heures/Semaine" 
+              value={extraKpis.medianHours} 
+              subValue="h/sem" 
+              percentage={(extraKpis.medianHours / 60) * 100} 
+              colorClass="bg-emerald-500" 
+              icon={Clock}
+            />
+            <KPICard 
+              title="KPI 5: Répartition Hommes" 
+              value={`${extraKpis.malePercent}%`} 
+              subValue={`F: ${extraKpis.femalePercent}%`} 
+              percentage={Number(extraKpis.malePercent)} 
+              colorClass="bg-blue-500" 
+              icon={Users}
+            />
+            <KPICard 
+              title="KPI 6: Coef. Variation Âge" 
+              value={`${extraKpis.cvAge}%`} 
+              subValue="Dispersion" 
+              percentage={Math.min(extraKpis.cvAge, 100)} 
+              colorClass="bg-rose-500" 
+              icon={TrendingUp}
             />
           </div>
 
@@ -502,6 +543,91 @@ Réponds avec uniquement 3 lignes numérotées "1. ...", "2. ...", "3. ...".`;
              />
           </ChartCard>
 
+          {/* GRAPHIQUES SUPPLÉMENTAIRES */}
+          <div className="grid grid-cols-2 gap-8">
+            {/* Pie Chart: Distribution des Revenus */}
+            <ChartCard title="Répartition des Revenus (Pie Chart)">
+              <Plot
+                data={[{
+                  values: [incomeDistribution.high, incomeDistribution.low],
+                  labels: ['> 50K$', '≤ 50K$'],
+                  type: 'pie',
+                  hole: 0.5,
+                  marker: {
+                    colors: ['#06b6d4', '#334155'],
+                    line: { color: '#0f172a', width: 2 }
+                  },
+                  textinfo: 'label+percent',
+                  textfont: { color: 'white', size: 12 },
+                } as any]}
+                layout={{ ...plotTheme, showlegend: false }}
+                config={{ responsive: true, displayModeBar: false }}
+                className="w-full h-full"
+                useResizeHandler
+              />
+            </ChartCard>
+
+            {/* Bar Chart: Taux de hauts revenus par tranche d'âge */}
+            <ChartCard title="Taux de Hauts Revenus par Tranche d'Âge">
+              <Plot
+                data={[
+                  {
+                    x: incomeByAge.map(d => d.group),
+                    y: incomeByAge.map(d => d.percent),
+                    type: 'bar',
+                    marker: {
+                      color: incomeByAge.map(d => {
+                        if (d.percent > 30) return '#06b6d4';
+                        if (d.percent > 20) return '#6366f1';
+                        return '#334155';
+                      }),
+                    },
+                    text: incomeByAge.map(d => `${d.percent.toFixed(1)}%`),
+                    textposition: 'outside',
+                    textfont: { color: '#94a3b8', size: 10 },
+                  }
+                ] as any}
+                layout={{ 
+                  ...plotTheme, 
+                  xaxis: { ...plotTheme.xaxis, title: { text: "Tranche d'Âge" } },
+                  yaxis: { ...plotTheme.yaxis, title: { text: "% Revenu >50K$" }, range: [0, Math.max(...incomeByAge.map(d => d.percent)) * 1.3] }
+                }}
+                config={{ responsive: true, displayModeBar: false }}
+                className="w-full h-full"
+                useResizeHandler
+              />
+            </ChartCard>
+          </div>
+
+          {/* Horizontal Bar: Top 10 Occupations */}
+          <ChartCard title="Top 10 Occupations par Effectif" className="min-h-[450px]">
+            <Plot
+              data={[{
+                y: occupationDist.map(d => d.category).reverse(),
+                x: occupationDist.map(d => d.count).reverse(),
+                type: 'bar',
+                orientation: 'h',
+                marker: {
+                  color: occupationDist.map((_, i) => {
+                    const colors = ['#06b6d4', '#6366f1', '#ec4899', '#f59e0b', '#10b981', '#8b5cf6', '#f43f5e', '#14b8a6', '#a855f7', '#3b82f6'];
+                    return colors[occupationDist.length - 1 - i] || '#334155';
+                  }).reverse(),
+                },
+                text: occupationDist.map(d => `${d.percent.toFixed(1)}%`).reverse(),
+                textposition: 'outside',
+                textfont: { color: '#94a3b8', size: 10 },
+              } as any]}
+              layout={{ 
+                ...plotTheme, 
+                margin: { t: 20, b: 40, l: 150, r: 60 },
+                xaxis: { ...plotTheme.xaxis, title: { text: "Nombre d'Individus" } },
+              }}
+              config={{ responsive: true, displayModeBar: false }}
+              className="w-full h-full"
+              useResizeHandler
+            />
+          </ChartCard>
+
           {/* ANALYSE EXPLORATOIRE (Requirement Partie 1) */}
           <motion.div 
             initial={{ opacity: 0 }}
@@ -517,9 +643,14 @@ Réponds avec uniquement 3 lignes numérotées "1. ...", "2. ...", "3. ...".`;
                      <thead>
                        <tr className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-black">
                          <th className="px-6 py-2">Variable</th>
+                         <th className="px-6 py-2 text-right">N</th>
                          <th className="px-6 py-2 text-right">Moyenne</th>
                          <th className="px-6 py-2 text-right">Ecart-Type</th>
+                         <th className="px-6 py-2 text-right">Min</th>
+                         <th className="px-6 py-2 text-right">Q1</th>
                          <th className="px-6 py-2 text-right text-cyan-400">Médiane</th>
+                         <th className="px-6 py-2 text-right">Q3</th>
+                         <th className="px-6 py-2 text-right">Max</th>
                        </tr>
                      </thead>
                      <tbody>
@@ -528,9 +659,14 @@ Réponds avec uniquement 3 lignes numérotées "1. ...", "2. ...", "3. ...".`;
                            <td className="px-6 py-4 rounded-l-2xl font-black text-white group-hover:text-cyan-400">
                              {col.toUpperCase()}
                            </td>
+                           <td className="px-6 py-4 text-right font-mono text-slate-500">{stats[col].count}</td>
                            <td className="px-6 py-4 text-right font-mono text-slate-300">{stats[col].mean}</td>
                            <td className="px-6 py-4 text-right font-mono text-slate-500">{stats[col].std}</td>
-                           <td className="px-6 py-4 text-right rounded-r-2xl font-mono font-bold text-cyan-400">{stats[col].median}</td>
+                           <td className="px-6 py-4 text-right font-mono text-slate-500">{stats[col].min}</td>
+                           <td className="px-6 py-4 text-right font-mono text-slate-400">{stats[col].q1}</td>
+                           <td className="px-6 py-4 text-right font-mono font-bold text-cyan-400">{stats[col].median}</td>
+                           <td className="px-6 py-4 text-right font-mono text-slate-400">{stats[col].q3}</td>
+                           <td className="px-6 py-4 text-right rounded-r-2xl font-mono text-slate-500">{stats[col].max}</td>
                          </tr>
                        ))}
                      </tbody>
@@ -541,38 +677,24 @@ Réponds avec uniquement 3 lignes numérotées "1. ...", "2. ...", "3. ...".`;
              <div className="bg-gradient-to-br from-cyan-900/10 to-transparent border border-white/10 rounded-[2.5rem] p-10 space-y-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-bold text-white flex items-center gap-3">
-                    <Info className="w-5 h-5 text-amber-500" /> Insights du Rapport
+                    <TrendingUp className="w-5 h-5 text-amber-500" /> Insights Statistiques
                   </h3>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={generateAiInsights}
-                    disabled={aiLoading}
-                    title="Générer des insights avec Gemini AI"
-                    className={cn(
-                      "p-2 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-colors flex items-center gap-1.5",
-                      aiLoading
-                        ? "bg-white/5 border-white/10 text-slate-500 cursor-wait"
-                        : "bg-purple-500/10 border-purple-500/30 text-purple-400 hover:bg-purple-500/20"
-                    )}
-                  >
-                    {aiLoading ? (
-                      <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-3 h-3 border-2 border-purple-400/20 border-t-purple-400 rounded-full" />
-                    ) : (
-                      <Activity className="w-3 h-3" />
-                    )}
-                    AI
-                  </motion.button>
+                  <span className="px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[9px] font-black uppercase tracking-widest">
+                    Auto
+                  </span>
                 </div>
                 <div className="space-y-4">
                   {[
                     { color: 'border-cyan-500', labelColor: 'text-cyan-400' },
                     { color: 'border-purple-500', labelColor: 'text-purple-400' },
                     { color: 'border-amber-500', labelColor: 'text-amber-400' },
-                  ].map((style, i) => (
+                    { color: 'border-emerald-500', labelColor: 'text-emerald-400' },
+                    { color: 'border-rose-500', labelColor: 'text-rose-400' },
+                    { color: 'border-blue-500', labelColor: 'text-blue-400' },
+                  ].slice(0, statisticalInsights.length).map((style, i) => (
                     <div key={i} className={cn("p-4 bg-black/40 rounded-2xl border-l-4", style.color)}>
                       <p className={cn("text-[10px] font-black uppercase mb-1", style.labelColor)}>Insight {i + 1}</p>
-                      <p className="text-[11px] text-slate-400">{aiInsights[i]}</p>
+                      <p className="text-[11px] text-slate-400">{statisticalInsights[i]}</p>
                     </div>
                   ))}
                 </div>
@@ -594,8 +716,9 @@ Réponds avec uniquement 3 lignes numérotées "1. ...", "2. ...", "3. ...".`;
               <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Dakar Institute of Technology (DIT)</p>
               <p className="text-[11px] italic text-white/50 underline decoration-cyan-500">Examen Final Data Visualisation 2024</p>
             </div>
-            <div className="text-right">
-              <p className="text-xs font-mono text-white/30 tracking-tighter uppercase">Généré via React/Plotly Interface de Diagnostic</p>
+            <div className="text-right space-y-1">
+              <p className="text-xs font-mono text-white/30 tracking-tighter uppercase">Analyse 100% Statistique -- Sans IA</p>
+              <p className="text-[9px] font-mono text-slate-600">Pearson, Quartiles, Distributions, CV</p>
             </div>
           </footer>
         </main>
@@ -623,14 +746,14 @@ Réponds avec uniquement 3 lignes numérotées "1. ...", "2. ...", "3. ...".`;
               
               <div className="flex justify-between items-start mb-8">
                 <div>
-                  <h2 className="text-3xl font-black italic tracking-tighter text-white uppercase italic">Fiche Individuelle</h2>
+                  <h2 className="text-3xl font-black italic tracking-tighter text-white uppercase">Fiche Individuelle</h2>
                   <p className="text-[10px] text-cyan-400 font-bold tracking-widest uppercase">ID Système: {selectedIndividualId}</p>
                 </div>
                 <button 
                   onClick={() => setSelectedIndividual(null)}
                   className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors"
                 >
-                  ✕
+                  X
                 </button>
               </div>
 
@@ -698,11 +821,12 @@ Réponds avec uniquement 3 lignes numérotées "1. ...", "2. ...", "3. ...".`;
                   <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
                     <div className="flex items-center gap-2 text-cyan-400 mb-2">
                        <Activity className="w-3 h-3" />
-                       <span className="text-[9px] font-black uppercase">Note de Diagnosis</span>
+                       <span className="text-[9px] font-black uppercase">Analyse Statistique</span>
                     </div>
                     <p className="text-[10px] text-slate-500 italic leading-relaxed">
-                      Individu représentatif du segment <span className="text-slate-300">"{selectedIndividual.workclass}"</span>. 
-                      Analyse de gain en capital effectuée.
+                      Individu du segment <span className="text-slate-300">"{selectedIndividual.workclass}"</span>. 
+                      Gain en capital: <span className="text-slate-300">{selectedIndividual['capital-gain']}</span>.
+                      Perte en capital: <span className="text-slate-300">{selectedIndividual['capital-loss']}</span>.
                     </p>
                   </div>
                 </div>
@@ -711,7 +835,7 @@ Réponds avec uniquement 3 lignes numérotées "1. ...", "2. ...", "3. ...".`;
               <div className="mt-10 pt-6 border-t border-white/10 flex justify-between items-center">
                  <div className="flex items-center gap-2">
                     <Info className="w-3 h-3 text-slate-500" />
-                    <span className="text-[8px] text-slate-600 uppercase tracking-widest">Données réelles • Recensement 1994</span>
+                    <span className="text-[8px] text-slate-600 uppercase tracking-widest">Données réelles -- Recensement 1994</span>
                  </div>
                  <button 
                   onClick={() => setSelectedIndividual(null)}
@@ -736,7 +860,7 @@ Réponds avec uniquement 3 lignes numérotées "1. ...", "2. ...", "3. ...".`;
           <div className="h-6 w-[1px] bg-white/10" />
           <div className="flex items-center gap-2">
              <AlertCircle className="w-3 h-3 text-emerald-400" />
-             <span className="text-[10px] font-black text-emerald-400 uppercase">PROJET FINALISÉ • PRÊT À DÉPLOYER</span>
+             <span className="text-[10px] font-black text-emerald-400 uppercase">100% STATISTIQUE -- SANS IA</span>
           </div>
         </motion.div>
       </AnimatePresence>
