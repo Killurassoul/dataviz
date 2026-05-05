@@ -25,7 +25,8 @@ import {
   Database,
   ArrowRight
 } from 'lucide-react';
-import { fetchAdultData, filterAdultData, calculateAdultKPIs, calculateDetailedStats, AdultData } from '../lib/dataService';
+import { fetchAdultData, filterAdultData, calculateAdultKPIs, calculateDetailedStats, calculateCorrelationMatrix, AdultData } from '../lib/dataService';
+import { GoogleGenAI } from '@google/genai';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -88,6 +89,15 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedIndividual, setSelectedIndividual] = useState<AdultData | null>(null);
+  const [selectedIndividualId] = useState<string>(() => Math.random().toString(36).substr(2, 9).toUpperCase());
+
+  // État pour les insights Gemini AI
+  const [aiInsights, setAiInsights] = useState<string[]>([
+    "Le niveau d'étude est le prédicteur n°1 des revenus supérieurs à 50K$.",
+    "La médiane de travail est fixée à 40h/semaine, quel que soit le sexe.",
+    "Les revenus élevés apparaissent statistiquement après 30 ans d'activité.",
+  ]);
+  const [aiLoading, setAiLoading] = useState(false);
 
   // Filtres Requis par le template (Variable, Catégorie, Slider)
   const [sexFilter, setSexFilter] = useState<string>('All');
@@ -135,6 +145,62 @@ export default function Dashboard() {
     return Array.from(set).sort();
   }, [rawData]);
 
+  // Matrice de corrélation calculée dynamiquement depuis les données filtrées
+  const correlationColumns = ['age', 'education-num', 'hours-per-week', 'capital-gain'];
+  const correlationLabels = ['Âge', 'Educ', 'Heures', 'Gain'];
+  const correlationMatrix = useMemo(
+    () => calculateCorrelationMatrix(filteredData, correlationColumns),
+    [filteredData]
+  );
+
+  // Calcul du % de hauts revenus par niveau d'éducation (utilisé pour le graphique et les insights AI)
+  const highIncomeEdu = useMemo(() => {
+    return uniqueEducation.map(edu => {
+      const subset = filteredData.filter(d => d.education === edu);
+      const count = subset.filter(d => d.income === '>50K').length;
+      return { edu, count, total: subset.length, percent: subset.length > 0 ? (count / subset.length) * 100 : 0 };
+    }).sort((a, b) => b.percent - a.percent);
+  }, [filteredData, uniqueEducation]);
+
+  // Génère des insights via Gemini AI
+  async function generateAiInsights() {
+    setAiLoading(true);
+    try {
+      const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || (import.meta as any).env?.GEMINI_API_KEY;
+      if (!apiKey) throw new Error('Clé API Gemini manquante');
+      const ai = new GoogleGenAI({ apiKey });
+      const kpisSnap = calculateAdultKPIs(filteredData);
+      const topEdu = highIncomeEdu.slice(0, 3).map(e => `${e.edu}: ${e.percent.toFixed(1)}%`).join(', ');
+      const prompt = `Tu es un data analyst. Voici des statistiques sur le recensement adulte UCI (filtres appliqués: sexe=${sexFilter}, éducation=${educationFilter}, âge max=${ageRange[1]}).
+- Effectif: ${kpisSnap.total} individus
+- Âge moyen: ${kpisSnap.avgAge} ans
+- Part hauts revenus (>50K$): ${kpisSnap.highIncomePercent}%
+- Top éducations par % hauts revenus: ${topEdu}
+
+Génère exactement 3 insights analytiques concis (1 phrase chacun, en français) sur ces données. 
+Réponds avec uniquement 3 lignes numérotées "1. ...", "2. ...", "3. ...".`;
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.0-flash',
+        contents: prompt,
+      });
+      const text = response.text || '';
+      const lines = text.split('\n')
+        .map((l: string) => l.replace(/^\d+\.\s*/, '').trim())
+        .filter((l: string) => l.length > 10)
+        .slice(0, 3);
+      if (lines.length === 3) setAiInsights(lines);
+    } catch (e) {
+      console.error('Gemini error:', e);
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  // Export du rapport en PDF via impression navigateur
+  function exportPDF() {
+    window.print();
+  }
+
   if (loading) return (
     <div className="h-screen w-full flex flex-col items-center justify-center bg-[#020617]">
       <motion.div 
@@ -146,6 +212,25 @@ export default function Dashboard() {
     </div>
   );
 
+  if (error) return (
+    <div className="h-screen w-full flex flex-col items-center justify-center bg-[#020617] gap-6">
+      <div className="w-16 h-16 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-center justify-center">
+        <AlertCircle className="w-8 h-8 text-red-400" />
+      </div>
+      <div className="text-center space-y-2">
+        <h2 className="text-xl font-black text-white uppercase tracking-tight">Erreur de Chargement</h2>
+        <p className="text-sm text-slate-400 font-mono max-w-md">{error}</p>
+      </div>
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        onClick={() => window.location.reload()}
+        className="flex items-center gap-2 px-6 py-3 bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-cyan-500/20 transition-colors"
+      >
+        <RefreshCcw className="w-4 h-4" /> Réessayer
+      </motion.button>
+    </div>
+  );
+
   const plotTheme = {
     paper_bgcolor: 'rgba(0,0,0,0)',
     plot_bgcolor: 'rgba(0,0,0,0)',
@@ -154,12 +239,6 @@ export default function Dashboard() {
     yaxis: { gridcolor: 'rgba(255,255,255,0.05)', zeroline: false, showgrid: true, tickfont: { size: 9 } },
     margin: { t: 20, b: 40, l: 40, r: 20 },
   };
-
-  const highIncomeEdu = uniqueEducation.map(edu => {
-    const subset = filteredData.filter(d => d.education === edu);
-    const count = subset.filter(d => d.income === '>50K').length;
-    return { edu, count, total: subset.length, percent: subset.length > 0 ? (count / subset.length) * 100 : 0 };
-  }).sort((a, b) => b.percent - a.percent);
 
   return (
     <div className="fixed inset-0 bg-[#020617] text-slate-100 font-sans overflow-hidden select-none flex flex-col">
@@ -337,27 +416,27 @@ export default function Dashboard() {
              {/* [Scatter Plot] */}
              <ChartCard title="Scatter Plot: Âge vs Niveau d'Éducation (Cliquer pour Détails)">
                 <Plot
-                  data={[{
-                    x: filteredData.slice(0, 1500).map(d => d.age),
-                    y: filteredData.slice(0, 1500).map(d => d['education-num']),
-                    customdata: filteredData.slice(0, 1500),
-                    mode: 'markers',
-                    type: 'scatter',
-                    marker: {
-                      size: 8,
-                      color: filteredData.slice(0, 1500).map(d => d.income === '>50K' ? '#ec4899' : '#06b6d4'),
-                      opacity: 0.5,
-                      line: { width: 1, color: 'rgba(255,255,255,0.2)' }
-                    },
-                    hovertemplate: '<b>Âge:</b> %{x}<br><b>Educ Score:</b> %{y}<br><extra></extra>'
-                  }]}
-                  onClick={(data) => {
-                    if (data.points && data.points.length > 0) {
-                      const point = data.points[0];
-                      const indData = (point.fullData as any).customdata[point.pointIndex];
-                      setSelectedIndividual(indData);
-                    }
-                  }}
+                   data={[{
+                     x: filteredData.slice(0, 1500).map(d => d.age),
+                     y: filteredData.slice(0, 1500).map(d => d['education-num']),
+                     customdata: filteredData.slice(0, 1500) as any,
+                     mode: 'markers',
+                     type: 'scatter',
+                     marker: {
+                       size: 8,
+                       color: filteredData.slice(0, 1500).map(d => d.income === '>50K' ? '#ec4899' : '#06b6d4'),
+                       opacity: 0.5,
+                       line: { width: 1, color: 'rgba(255,255,255,0.2)' }
+                     },
+                     hovertemplate: '<b>Âge:</b> %{x}<br><b>Educ Score:</b> %{y}<br><extra></extra>'
+                   } as any]}
+                   onClick={(data) => {
+                     if (data.points && data.points.length > 0) {
+                       const point = data.points[0];
+                       const indData = (point as any).customdata as AdultData;
+                       setSelectedIndividual(indData);
+                     }
+                   }}
                   layout={{ 
                     ...plotTheme, 
                     xaxis: { ...plotTheme.xaxis, title: { text: "Âge" } },
@@ -375,14 +454,23 @@ export default function Dashboard() {
              <ChartCard title="Heatmap: Matrice de Corrélation des Variables">
                 <Plot
                   data={[{
-                    z: [[1, 0.15, 0.08, 0.3], [0.15, 1, 0.12, 0.1], [0.08, 0.12, 1, 0.05], [0.3, 0.1, 0.05, 1]],
-                    x: ['Âge', 'Educ', 'Heures', 'Gain'],
-                    y: ['Âge', 'Educ', 'Heures', 'Gain'],
+                    z: correlationMatrix,
+                    x: correlationLabels,
+                    y: correlationLabels,
                     type: 'heatmap',
-                    colorscale: 'Blues',
-                    showscale: false
-                  }]}
-                  layout={{ ...plotTheme }}
+                    colorscale: [
+                      [0, '#1e3a5f'],
+                      [0.5, '#0e4d6b'],
+                      [1, '#06b6d4'],
+                    ],
+                    zmin: -1,
+                    zmax: 1,
+                    showscale: true,
+                    text: correlationMatrix.map(row => row.map(v => v.toFixed(2))),
+                    texttemplate: '%{text}',
+                    textfont: { color: 'white', size: 11 },
+                  } as any]}
+                  layout={{ ...plotTheme, margin: { t: 20, b: 60, l: 60, r: 20 } }}
                   config={{ responsive: true, displayModeBar: false }}
                   className="w-full h-full"
                   useResizeHandler
@@ -451,27 +539,52 @@ export default function Dashboard() {
              </div>
 
              <div className="bg-gradient-to-br from-cyan-900/10 to-transparent border border-white/10 rounded-[2.5rem] p-10 space-y-6">
-                <h3 className="text-xl font-bold text-white flex items-center gap-3">
-                  <Info className="w-5 h-5 text-amber-500" /> Insights du Rapport
-                </h3>
-                <div className="space-y-4">
-                  <div className="p-4 bg-black/40 rounded-2xl border-l-4 border-cyan-500">
-                    <p className="text-[10px] font-black text-cyan-400 uppercase mb-1">Insight 1</p>
-                    <p className="text-[11px] text-slate-400">Le niveau d'étude est le prédicteur n°1 des revenus supérieurs à 50K$.</p>
-                  </div>
-                  <div className="p-4 bg-black/40 rounded-2xl border-l-4 border-purple-500">
-                    <p className="text-[10px] font-black text-purple-400 uppercase mb-1">Insight 2</p>
-                    <p className="text-[11px] text-slate-400">La médiane de travail est fixée à 40h/semaine, quel que soit le sexe.</p>
-                  </div>
-                  <div className="p-4 bg-black/40 rounded-2xl border-l-4 border-amber-500">
-                    <p className="text-[10px] font-black text-amber-400 uppercase mb-1">Insight 3</p>
-                    <p className="text-[11px] text-slate-400">Les revenus élevés apparaissent statistiquement après 30 ans d'activité.</p>
-                  </div>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-bold text-white flex items-center gap-3">
+                    <Info className="w-5 h-5 text-amber-500" /> Insights du Rapport
+                  </h3>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={generateAiInsights}
+                    disabled={aiLoading}
+                    title="Générer des insights avec Gemini AI"
+                    className={cn(
+                      "p-2 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-colors flex items-center gap-1.5",
+                      aiLoading
+                        ? "bg-white/5 border-white/10 text-slate-500 cursor-wait"
+                        : "bg-purple-500/10 border-purple-500/30 text-purple-400 hover:bg-purple-500/20"
+                    )}
+                  >
+                    {aiLoading ? (
+                      <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-3 h-3 border-2 border-purple-400/20 border-t-purple-400 rounded-full" />
+                    ) : (
+                      <Activity className="w-3 h-3" />
+                    )}
+                    AI
+                  </motion.button>
                 </div>
-                <div className="pt-4">
-                   <button className="flex items-center gap-2 text-[10px] font-black text-white hover:text-cyan-400 transition-colors uppercase tracking-[0.2em]">
+                <div className="space-y-4">
+                  {[
+                    { color: 'border-cyan-500', labelColor: 'text-cyan-400' },
+                    { color: 'border-purple-500', labelColor: 'text-purple-400' },
+                    { color: 'border-amber-500', labelColor: 'text-amber-400' },
+                  ].map((style, i) => (
+                    <div key={i} className={cn("p-4 bg-black/40 rounded-2xl border-l-4", style.color)}>
+                      <p className={cn("text-[10px] font-black uppercase mb-1", style.labelColor)}>Insight {i + 1}</p>
+                      <p className="text-[11px] text-slate-400">{aiInsights[i]}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="pt-4 flex gap-3">
+                   <motion.button
+                     whileHover={{ scale: 1.03 }}
+                     whileTap={{ scale: 0.97 }}
+                     onClick={exportPDF}
+                     className="flex items-center gap-2 text-[10px] font-black text-white hover:text-cyan-400 transition-colors uppercase tracking-[0.2em]"
+                   >
                      Exporter Rapport PDF <ArrowRight className="w-3 h-3" />
-                   </button>
+                   </motion.button>
                 </div>
              </div>
           </motion.div>
@@ -511,7 +624,7 @@ export default function Dashboard() {
               <div className="flex justify-between items-start mb-8">
                 <div>
                   <h2 className="text-3xl font-black italic tracking-tighter text-white uppercase italic">Fiche Individuelle</h2>
-                  <p className="text-[10px] text-cyan-400 font-bold tracking-widest uppercase">ID Système: {Math.random().toString(36).substr(2, 9).toUpperCase()}</p>
+                  <p className="text-[10px] text-cyan-400 font-bold tracking-widest uppercase">ID Système: {selectedIndividualId}</p>
                 </div>
                 <button 
                   onClick={() => setSelectedIndividual(null)}

@@ -141,6 +141,48 @@ export function calculateAdultKPIs(data: AdultData[]) {
 }
 
 /**
+ * Calcule la matrice de corrélation de Pearson pour les colonnes numériques données.
+ */
+export function calculateCorrelationMatrix(data: AdultData[], columns: string[]): number[][] {
+  const n = columns.length;
+  const matrix: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
+
+  // Extraire les vecteurs de valeurs valides pour chaque colonne
+  const vectors: number[][] = columns.map(col =>
+    data.map(d => d[col]).filter(v => typeof v === 'number' && !isNaN(v))
+  );
+
+  // Limiter au nombre de lignes valides communes (taille minimale)
+  const minLen = Math.min(...vectors.map(v => v.length));
+  const trimmed = vectors.map(v => v.slice(0, minLen));
+
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      if (i === j) {
+        matrix[i][j] = 1;
+        continue;
+      }
+      const xi = trimmed[i];
+      const xj = trimmed[j];
+      const meanI = xi.reduce((a, b) => a + b, 0) / minLen;
+      const meanJ = xj.reduce((a, b) => a + b, 0) / minLen;
+      let num = 0, denomI = 0, denomJ = 0;
+      for (let k = 0; k < minLen; k++) {
+        const di = xi[k] - meanI;
+        const dj = xj[k] - meanJ;
+        num += di * dj;
+        denomI += di * di;
+        denomJ += dj * dj;
+      }
+      const denom = Math.sqrt(denomI * denomJ);
+      matrix[i][j] = denom === 0 ? 0 : Number((num / denom).toFixed(3));
+    }
+  }
+
+  return matrix;
+}
+
+/**
  * Calcule les statistiques descriptives pour une colonne donnée.
  */
 export function calculateDetailedStats(data: AdultData[], column: string): DescriptiveStats {
